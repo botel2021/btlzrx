@@ -13,6 +13,7 @@ import { MonthlyReportView } from './components/MonthlyReportView';
 import { AnnualReportView } from './components/AnnualReportView';
 import { SettingsModal } from './components/SettingsModal';
 import { LoginModal } from './components/LoginModal';
+import { getLocalData, saveLocalData, resetLocalData } from './utils/localStore';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'today' | 'monthly' | 'annual' | 'settings'>('today');
@@ -67,7 +68,7 @@ export default function App() {
 
   const previousRecordsCountRef = useRef<number>(0);
 
-  // Fetch state from server
+  // Fetch state from server or local storage fallback
   const loadState = async (isInitial = false) => {
     try {
       const res = await fetch('/api/state');
@@ -77,6 +78,15 @@ export default function App() {
         setClasses(data.classes);
         setStudents(data.students);
         setActiveSunday(data.activeSunday);
+
+        // Keep local cache synced as fallback
+        saveLocalData({
+          classes: data.classes,
+          students: data.students,
+          config: data.config,
+          records: data.records,
+          activeSunday: data.activeSunday
+        });
 
         // Detect new real-time check-in
         if (!isInitial && data.records.length > previousRecordsCountRef.current) {
@@ -88,12 +98,23 @@ export default function App() {
         }
         previousRecordsCountRef.current = data.records.length;
         setRecords(data.records);
+        if (isInitial) setLoading(false);
+        return;
       }
     } catch (err) {
-      console.error('Failed to load state:', err);
-    } finally {
-      if (isInitial) setLoading(false);
+      // Offline / GitHub Pages static mode
     }
+
+    // Fallback to local storage
+    const local = getLocalData();
+    setConfig(local.config);
+    setClasses(local.classes);
+    setStudents(local.students);
+    setActiveSunday(local.activeSunday);
+    setRecords(local.records);
+    previousRecordsCountRef.current = local.records.length;
+
+    if (isInitial) setLoading(false);
   };
 
   useEffect(() => {
@@ -155,14 +176,50 @@ export default function App() {
     offeringCompleted?: boolean;
     notes?: string;
   }) => {
-    const res = await fetch('/api/manual-checkin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) {
-      await loadState(false);
+    try {
+      const res = await fetch('/api/manual-checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        await loadState(false);
+        return;
+      }
+    } catch {
+      // Offline / Static
     }
+
+    // Local fallback update
+    setRecords(prev => {
+      const student = students.find(s => s.id === data.studentId);
+      const studentName = student ? student.name : '';
+      const studentClassId = student ? student.classId : '';
+      const existingIdx = prev.findIndex(r => r.studentId === data.studentId && r.date === data.date);
+      
+      const nowStr = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      const newRecord: AttendanceRecord = {
+        id: existingIdx !== -1 ? prev[existingIdx].id : `rec-${data.date}-${data.studentId}`,
+        studentId: data.studentId,
+        studentName,
+        classId: studentClassId,
+        date: data.date,
+        timestamp: new Date().toISOString(),
+        timeStr: nowStr.substring(0, 5),
+        status: data.status,
+        method: 'manual_teacher',
+        memoryVerseCompleted: !!data.memoryVerseCompleted,
+        offeringCompleted: data.offeringCompleted,
+        notes: data.notes
+      };
+
+      const updated = existingIdx !== -1 
+        ? prev.map((r, i) => i === existingIdx ? newRecord : r)
+        : [...prev, newRecord];
+      
+      saveLocalData({ records: updated });
+      return updated;
+    });
   };
 
   // Auth headers helper
@@ -187,16 +244,26 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，无权更改系统设置！');
     }
-    const res = await fetch('/api/config', {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(updated),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || '保存系统配置失败');
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(updated),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setConfig(data.config);
+        saveLocalData({ config: data.config });
+        return;
+      }
+    } catch {
+      // Offline / Static
     }
-    setConfig(data.config);
+    setConfig(prev => {
+      const merged = { ...prev, ...updated };
+      saveLocalData({ config: merged });
+      return merged;
+    });
   };
 
   // Quick toggle test mode
@@ -214,16 +281,40 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加或修改班级的权限！');
     }
-    const res = await fetch('/api/classes', {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(classData),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || '保存班级失败');
+    try {
+      const res = await fetch('/api/classes', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(classData),
+      });
+      if (res.ok) {
+        await loadState(false);
+        return;
+      }
+    } catch {
+      // Offline / Static
     }
-    await loadState(false);
+    setClasses(prev => {
+      let updated: ClassGroup[];
+      if (classData.id) {
+        updated = prev.map(c => c.id === classData.id ? { ...c, ...classData } as ClassGroup : c);
+      } else {
+        const newClass: ClassGroup = {
+          id: `class-${Date.now()}`,
+          name: classData.name || '新班级',
+          ageRange: classData.ageRange || '3-12岁',
+          teacher: classData.teacher || '主日学老师',
+          classroom: classData.classroom || '主堂教室',
+          color: classData.color || 'bg-amber-500',
+          groupType: classData.groupType || 'sunday_school',
+          targetCapacity: classData.targetCapacity || 20,
+          description: classData.description || ''
+        };
+        updated = [...prev, newClass];
+      }
+      saveLocalData({ classes: updated });
+      return updated;
+    });
   };
 
   // Handle delete class
@@ -231,15 +322,23 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有删除班级的权限！');
     }
-    const res = await fetch(`/api/classes/${classId}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || '删除班级失败');
+    try {
+      const res = await fetch(`/api/classes/${classId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        await loadState(false);
+        return;
+      }
+    } catch {
+      // Offline / Static
     }
-    await loadState(false);
+    setClasses(prev => {
+      const updated = prev.filter(c => c.id !== classId);
+      saveLocalData({ classes: updated });
+      return updated;
+    });
   };
 
   // Handle add student
@@ -247,16 +346,28 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加学员的权限！');
     }
-    const res = await fetch('/api/students', {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(studentData),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || '登记学员失败');
+    try {
+      const res = await fetch('/api/students', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(studentData),
+      });
+      if (res.ok) {
+        await loadState(false);
+        return;
+      }
+    } catch {
+      // Offline / Static
     }
-    await loadState(false);
+    setStudents(prev => {
+      const newStudent: Student = {
+        ...studentData,
+        id: `s-${Date.now()}`
+      };
+      const updated = [...prev, newStudent];
+      saveLocalData({ students: updated });
+      return updated;
+    });
   };
 
   // Handle batch add students
@@ -264,16 +375,37 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有批量添加学员的权限！');
     }
-    const res = await fetch('/api/students/batch', {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ classId, namesText, defaultAge, defaultBirthDate }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || '批量录入失败');
+    try {
+      const res = await fetch('/api/students/batch', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ classId, namesText, defaultAge, defaultBirthDate }),
+      });
+      if (res.ok) {
+        await loadState(false);
+        return;
+      }
+    } catch {
+      // Offline / Static
     }
-    await loadState(false);
+    const lines = namesText.split(/[\n,，]+/).map(s => s.trim()).filter(Boolean);
+    const newItems: Student[] = lines.map((name, i) => ({
+      id: `s-${Date.now()}-${i}`,
+      name,
+      gender: i % 2 === 0 ? 'boy' : 'girl',
+      age: defaultAge || 7,
+      birthDate: defaultBirthDate || '2019-06-01',
+      classId,
+      parentName: '家长/本人',
+      parentPhone: '未填写',
+      memberCode: `BTL-${Math.floor(100 + Math.random() * 900)}`,
+      joinDate: new Date().toISOString().split('T')[0]
+    }));
+    setStudents(prev => {
+      const updated = [...prev, ...newItems];
+      saveLocalData({ students: updated });
+      return updated;
+    });
   };
 
   // Handle delete student
@@ -281,15 +413,23 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有删除学员的权限！');
     }
-    const res = await fetch(`/api/students/${studentId}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || '删除学员失败');
+    try {
+      const res = await fetch(`/api/students/${studentId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        await loadState(false);
+        return;
+      }
+    } catch {
+      // Offline / Static
     }
-    await loadState(false);
+    setStudents(prev => {
+      const updated = prev.filter(s => s.id !== studentId);
+      saveLocalData({ students: updated });
+      return updated;
+    });
   };
 
   // Handle reset data
@@ -297,18 +437,30 @@ export default function App() {
     if (currentUser?.role !== 'superadmin') {
       throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，无权重置系统示范数据！');
     }
-    const res = await fetch('/api/reset-data', { 
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      await loadState(false);
-      setNewCheckinAlert('已恢复为伯特利教会主日学与团契官方示范数据！');
-      setTimeout(() => setNewCheckinAlert(null), 3000);
-    } else {
-      throw new Error(data.error || '重置数据失败');
+    try {
+      const res = await fetch('/api/reset-data', { 
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        await loadState(false);
+        setNewCheckinAlert('已恢复为伯特利教会主日学与团契官方示范数据！');
+        setTimeout(() => setNewCheckinAlert(null), 3000);
+        return;
+      }
+    } catch {
+      // Offline / Static
     }
+    const reset = resetLocalData();
+    if (reset) {
+      setClasses(reset.classes);
+      setStudents(reset.students);
+      setConfig(reset.config);
+      setRecords(reset.records);
+      setActiveSunday(reset.activeSunday);
+    }
+    setNewCheckinAlert('已恢复为伯特利教会主日学与团契官方示范数据！');
+    setTimeout(() => setNewCheckinAlert(null), 3000);
   };
 
   if (loading) {

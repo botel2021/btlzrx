@@ -12,6 +12,7 @@ import {
   Check
 } from 'lucide-react';
 import type { AdminUser } from '../types';
+import { localLogin } from '../utils/localStore';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -37,17 +38,31 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setLoading(true);
 
     try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || '登录失败，请检查账号密码');
+      let loggedUser: AdminUser | null = null;
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          loggedUser = data.user;
+        }
+      } catch (networkErr) {
+        // Network or offline
       }
 
-      onLoginSuccess(data.user);
+      // If server response didn't yield a user, try local credentials
+      if (!loggedUser) {
+        loggedUser = localLogin(username, password);
+      }
+
+      if (!loggedUser) {
+        throw new Error('登录失败：账号或密码错误，请核对后重试');
+      }
+
+      onLoginSuccess(loggedUser);
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || '网络连接或密码错误');
