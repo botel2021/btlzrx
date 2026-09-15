@@ -8,15 +8,16 @@ import {
   Clock, 
   FileText, 
   XCircle, 
-  BookOpen, 
   Download,
   Church,
   ChevronLeft,
   ChevronRight,
   TrendingUp,
-  Star
+  Star,
+  Lock,
+  LogIn
 } from 'lucide-react';
-import type { Student, ClassGroup, AttendanceRecord, SystemConfig } from '../types';
+import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../types';
 import { getSundaysInMonth, formatShortChineseDate } from '../utils/dateUtils';
 
 interface MonthlyReportViewProps {
@@ -24,6 +25,8 @@ interface MonthlyReportViewProps {
   classes: ClassGroup[];
   students: Student[];
   records: AttendanceRecord[];
+  currentUser: AdminUser | null;
+  onOpenLogin: () => void;
 }
 
 export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
@@ -31,6 +34,8 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
   classes,
   students,
   records,
+  currentUser,
+  onOpenLogin,
 }) => {
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonth, setSelectedMonth] = useState<number>(8); // 8 is September (0-indexed)
@@ -52,7 +57,6 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
     let attendedCount = 0;
     let lateCount = 0;
     let excusedCount = 0;
-    let verseCount = 0;
 
     const sundayRecords = sundaysInMonth.map(sunDate => {
       const rec = records.find(r => r.studentId === student.id && r.date === sunDate);
@@ -64,7 +68,6 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
         } else if (rec.status === 'excused') {
           excusedCount++;
         }
-        if (rec.memoryVerseCompleted) verseCount++;
       }
       return { date: sunDate, record: rec };
     });
@@ -79,7 +82,6 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
       attendedCount,
       lateCount,
       excusedCount,
-      verseCount,
       rate,
       isFullAttendance,
     };
@@ -93,11 +95,31 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
   const overallMonthRate = totalPossibleAttendances > 0 
     ? Math.round((totalActualAttendances / totalPossibleAttendances) * 100) 
     : 0;
-  const totalVersesMastered = studentStats.reduce((sum, s) => sum + s.verseCount, 0);
 
   const handlePrint = () => {
     window.print();
   };
+
+  if (!currentUser) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-8 sm:p-12 text-center max-w-lg mx-auto my-8 shadow-xs">
+        <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-7 h-7" />
+        </div>
+        <h3 className="text-base font-bold text-slate-900 mb-2">学生月度考勤明细仅供主日学同工查阅</h3>
+        <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+          为保护主日学未成年孩童与团契成员信息安全，月度考勤明细及出勤档案受权限保护。请使用教师或管理员账号登录后查阅。
+        </p>
+        <button
+          onClick={onOpenLogin}
+          className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-xs cursor-pointer"
+        >
+          <LogIn className="w-4 h-4" />
+          <span>主日学老师 / 同工登录</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -215,17 +237,17 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-200 shadow-2xs">
-          <div className="flex items-center justify-between text-xs text-blue-800 font-medium">
-            <span>金句背诵达标总数</span>
-            <BookOpen className="w-4 h-4 text-blue-600" />
+        <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200 shadow-2xs">
+          <div className="flex items-center justify-between text-xs text-amber-900 font-medium">
+            <span>月度全勤达标人数</span>
+            <Award className="w-4 h-4 text-amber-700" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-blue-800">{totalVersesMastered}</span>
-            <span className="text-xs text-blue-600 font-medium">颗金星</span>
+            <span className="text-3xl font-bold text-amber-900">{fullAttendanceStudents.length}</span>
+            <span className="text-xs text-amber-700 font-medium">人</span>
           </div>
-          <p className="mt-2 text-[11px] text-blue-700">
-            全班积极背诵圣经真道
+          <p className="mt-2 text-[11px] text-amber-800">
+            忠心坚守主日崇拜与聚会
           </p>
         </div>
 
@@ -247,7 +269,7 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
           </div>
           
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-            {fullAttendanceStudents.map(({ student, verseCount }) => (
+            {fullAttendanceStudents.map(({ student }) => (
               <div 
                 key={student.id}
                 className="bg-white/10 hover:bg-white/20 transition-colors p-3 rounded-xl border border-white/15 text-center backdrop-blur-xs"
@@ -260,7 +282,7 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
                   {classes.find(c => c.id === student.classId)?.name.split(' ')[0]}
                 </div>
                 <div className="mt-1 text-[10px] text-amber-100 bg-black/20 px-1.5 py-0.5 rounded-md inline-block">
-                  ⭐ 金句 {verseCount} 次
+                  全勤达标 ⭐
                 </div>
               </div>
             ))}
@@ -277,7 +299,7 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
               {monthName} 主日出勤总矩阵明细
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              图例说明： 🟢 准时到校 | 🟡 迟到 | 🔵 请假 | ⚪ 缺勤 | ⭐ 背诵金句
+              图例说明： 🟢 准时到校 | 🟡 迟到 | 🔵 请假 | ⚪ 缺勤
             </p>
           </div>
 
@@ -314,7 +336,6 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
                   </th>
                 ))}
                 <th className="px-3 py-3 font-semibold text-center">出勤/总周</th>
-                <th className="px-3 py-3 font-semibold text-center">金句背诵</th>
                 <th className="px-3 py-3 font-semibold text-center">月度出勤率</th>
                 <th className="px-4 py-3 font-semibold text-center">评级</th>
               </tr>
@@ -358,9 +379,6 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
                             >
                               {record.status === 'present' ? '到' : record.status === 'late' ? '迟' : '假'}
                             </span>
-                            {record.memoryVerseCompleted && (
-                              <span className="text-[9px] text-amber-700 -mt-0.5">★</span>
-                            )}
                           </div>
                         ) : (
                           <span className="w-5 h-5 rounded-full inline-flex items-center justify-center text-slate-300 font-mono">
@@ -372,10 +390,6 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({
 
                     <td className="px-3 py-3 text-center font-semibold text-slate-800 font-mono">
                       {item.attendedCount} / {sundaysInMonth.length}
-                    </td>
-
-                    <td className="px-3 py-3 text-center text-blue-700 font-semibold font-mono">
-                      ⭐ {item.verseCount}
                     </td>
 
                     <td className="px-3 py-3 text-center">

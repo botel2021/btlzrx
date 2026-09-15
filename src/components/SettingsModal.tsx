@@ -946,7 +946,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span>您当前账号可执行的操作：</span>
                   </div>
                   <ul className="text-[11px] text-slate-500 pl-5 space-y-1 list-disc leading-relaxed">
-                    <li>在「今日主日签到」页面进行实时打卡、金句记录与请假登记</li>
+                    <li>在「今日主日签到」页面进行实时打卡与请假登记</li>
                     <li>随时查阅左侧学员花名册与班级定额达成率</li>
                     <li>查阅月度全勤表与年度结业荣誉档案</li>
                   </ul>
@@ -986,69 +986,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            {/* 1. 金句背诵模块开关 */}
-            <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                    1
-                  </span>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    是否开启「圣经金句背诵」模块
-                  </h4>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  关闭后，点名与考勤表将不再展示金句背诵考核，简化打卡步骤。
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggleOption('enableMemoryVerseOption', !optionsState.enableMemoryVerseOption)}
-                className="cursor-pointer shrink-0"
-              >
-                {optionsState.enableMemoryVerseOption ? (
-                  <ToggleRight className="w-9 h-9 text-amber-700" />
-                ) : (
-                  <ToggleLeft className="w-9 h-9 text-slate-300" />
-                )}
-              </button>
-            </div>
-
-            {/* 2. 金句默认勾选开关 */}
-            <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                    2
-                  </span>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    打卡时默认是否预先勾选「已背诵金句」
-                  </h4>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  开启后，学生或老师打卡时复选框默认预先打勾，方便大多数学生免重复点击。
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggleOption('defaultMemoryVerseChecked', !optionsState.defaultMemoryVerseChecked)}
-                className="cursor-pointer shrink-0"
-              >
-                {optionsState.defaultMemoryVerseChecked ? (
-                  <ToggleRight className="w-9 h-9 text-amber-700" />
-                ) : (
-                  <ToggleLeft className="w-9 h-9 text-slate-300" />
-                )}
-              </button>
-            </div>
-
-            {/* 3. 迟到判定规则开关与时刻 */}
+            {/* 1. 迟到判定规则开关与时刻 */}
             <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-3">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
-                      3
+                      1
                     </span>
                     <h4 className="text-xs font-bold text-slate-900">
                       是否启用「迟到」判定规则
@@ -1088,19 +1032,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </div>
 
-            {/* 4. 请假与随行代祷备注功能开关 */}
+            {/* 2. 请假与随行代祷备注功能开关 */}
             <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
-                    4
+                    2
                   </span>
                   <h4 className="text-xs font-bold text-slate-900">
                     是否开启「代祷/随行事项」输入项
                   </h4>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  允许家长或学生在打卡时附带简短文字说明（如感冒请假、代祷需求等）。
+                  点名时可为学生填写代祷事项、请假理由或随行状况备注。
                 </p>
               </div>
               <button
@@ -1116,7 +1060,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
-            {/* 5. 测试模式开关 */}
+            {/* 3. 奉献打卡开关 */}
+            <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
+                    3
+                  </span>
+                  <h4 className="text-xs font-bold text-slate-900">
+                    是否开启主日「奉献」打卡项
+                  </h4>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                  开启后，签到卡片可标记学员是否参与主日奉献。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToggleOption('enableOfferingOption', !optionsState.enableOfferingOption)}
+                className="cursor-pointer shrink-0"
+              >
+                {optionsState.enableOfferingOption ? (
+                  <ToggleRight className="w-9 h-9 text-amber-700" />
+                ) : (
+                  <ToggleLeft className="w-9 h-9 text-slate-300" />
+                )}
+              </button>
+            </div>
+
+            {/* 4. 测试模式开关 */}
             <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/50 flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
@@ -1142,12 +1114,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
-            {/* 6. 大屏悬浮弹窗喜报开关 */}
+            {/* 5. 大屏悬浮弹窗喜报开关 */}
             <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
-                    6
+                    5
                   </span>
                   <h4 className="text-xs font-bold text-slate-900">
                     大屏实时签到悬浮喜报

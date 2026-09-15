@@ -5,7 +5,6 @@ import {
   Clock, 
   UserX, 
   FileText, 
-  BookOpen, 
   Search, 
   Filter, 
   Check, 
@@ -13,9 +12,13 @@ import {
   AlertCircle,
   Phone,
   ChevronDown,
-  Church
+  Church,
+  Lock,
+  LogIn,
+  ShieldAlert,
+  Sparkles
 } from 'lucide-react';
-import type { Student, ClassGroup, AttendanceRecord, SystemConfig } from '../types';
+import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../types';
 import { formatChineseDate } from '../utils/dateUtils';
 import { calculateAge, formatBirthDate } from '../utils/studentUtils';
 
@@ -25,6 +28,8 @@ interface TodayDashboardProps {
   students: Student[];
   records: AttendanceRecord[];
   activeSunday: string;
+  currentUser: AdminUser | null;
+  onOpenLogin: () => void;
   onManualUpdate: (data: {
     studentId: string;
     date: string;
@@ -41,6 +46,8 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   students,
   records,
   activeSunday,
+  currentUser,
+  onOpenLogin,
   onManualUpdate,
 }) => {
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
@@ -70,38 +77,18 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   const checkedInTotal = presentCount + lateCount;
   const absentCount = totalCount - checkedInTotal - excusedCount;
   const attendanceRate = totalCount > 0 ? Math.round((checkedInTotal / totalCount) * 100) : 0;
-  const verseCount = todayRecords.filter(r => r.memoryVerseCompleted).length;
 
   const handleQuickStatus = async (
     studentId: string,
-    status: 'present' | 'late' | 'excused' | 'absent',
-    verse?: boolean
+    status: 'present' | 'late' | 'excused' | 'absent'
   ) => {
     setLoadingStudentId(studentId);
     try {
-      const existing = todayRecords.find(r => r.studentId === studentId);
       await onManualUpdate({
         studentId,
         date: activeSunday,
         status,
-        memoryVerseCompleted: verse !== undefined ? verse : (existing ? existing.memoryVerseCompleted : true),
-        offeringCompleted: false,
-      });
-    } finally {
-      setLoadingStudentId(null);
-    }
-  };
-
-  const handleToggleVerse = async (studentId: string) => {
-    const existing = todayRecords.find(r => r.studentId === studentId);
-    if (!existing) return;
-    setLoadingStudentId(studentId);
-    try {
-      await onManualUpdate({
-        studentId,
-        date: activeSunday,
-        status: existing.status,
-        memoryVerseCompleted: !existing.memoryVerseCompleted,
+        memoryVerseCompleted: false,
         offeringCompleted: false,
       });
     } finally {
@@ -132,6 +119,134 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
       setLoadingStudentId(null);
     }
   };
+
+  // 访客页面：只能看到班级列表，不能看到学生姓名等资料；签到需登录后才能使用
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        {/* Visitor Welcome & Login Notice */}
+        <div className="bg-linear-to-r from-amber-700 via-amber-800 to-amber-900 rounded-2xl p-6 text-white shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-amber-100 text-xs font-semibold backdrop-blur-xs flex items-center gap-1">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-200" />
+                  <span>访客模式（学生隐私受保护）</span>
+                </span>
+                <span className="text-xs text-amber-200">
+                  当前主日：{formatChineseDate(activeSunday)}
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold font-serif">
+                {config.churchName} {config.schoolTitle}
+              </h2>
+              <p className="text-xs sm:text-sm text-amber-100/90 max-w-2xl leading-relaxed">
+                为保护主日学未成年孩童与团契成员的隐私安全，学生姓名、出生年月及考勤点名功能仅对本堂主日学教师及同工开放。访客可在此查阅各班级与团契基本设置。
+              </p>
+            </div>
+
+            <button
+              onClick={onOpenLogin}
+              className="self-start sm:self-center px-5 py-2.5 rounded-xl bg-white text-slate-900 hover:bg-amber-50 font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+            >
+              <LogIn className="w-4 h-4 text-amber-700" />
+              <span>教师 / 同工登录签到</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Class Directory Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Church className="w-5 h-5 text-amber-700" />
+              <span>主日学与团契班级总览（共 {classes.length} 个班级）</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              各年龄段班级宗旨、适龄标准、活动教室与负责同工介绍
+            </p>
+          </div>
+        </div>
+
+        {/* Class Cards Grid (Strictly no student names or personal data) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {classes.map(cls => {
+            const classStudentCount = students.filter(s => s.classId === cls.id).length;
+            const isFellowship = cls.groupType === 'fellowship';
+
+            return (
+              <div
+                key={cls.id}
+                className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-sm">
+                        <Church className="w-5 h-5 text-amber-800" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-slate-900">{cls.name}</h4>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[11px] px-2 py-0.2 rounded-full bg-slate-100 text-slate-600 font-medium">
+                            适龄：{cls.ageRange}
+                          </span>
+                          <span className={`text-[10px] px-2 py-0.2 rounded-full font-semibold ${
+                            isFellowship
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-amber-100 text-amber-900'
+                          }`}>
+                            {isFellowship ? '青年团契' : '主日学'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs text-slate-600 my-3.5 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">负责导师/同工：</span>
+                      <span className="font-semibold text-slate-800">{cls.teacher}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">活动课室：</span>
+                      <span className="font-semibold text-slate-800">{cls.classroom}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">在册学员规模：</span>
+                      <span className="font-semibold text-amber-800 font-mono">
+                        {classStudentCount} 人 <span className="text-slate-400 font-normal">（班级定额 {cls.targetCapacity || 20} 人）</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {cls.description && (
+                    <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">
+                      {cls.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-slate-400" />
+                    <span>学生花名册仅登录可见</span>
+                  </span>
+                  <button
+                    onClick={onOpenLogin}
+                    className="text-amber-800 hover:text-amber-950 font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>登录签到</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -209,7 +324,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
             <span className="text-xs text-amber-100 font-medium">今日到勤率</span>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-2xl font-bold">{attendanceRate}%</span>
-              <span className="text-[10px] text-amber-200">背诵:{verseCount}人</span>
+              <span className="text-[10px] text-amber-200">已到 {checkedInTotal} 人</span>
             </div>
           </div>
 
@@ -364,31 +479,12 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Badges / Notes row if checked in */}
-              {record && (
-                <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-1 text-[11px]">
-                  <div className="flex items-center gap-2">
-                    {config.enableMemoryVerseOption !== false && (
-                      <button
-                        onClick={() => handleToggleVerse(student.id)}
-                        className={`px-1.5 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors ${
-                          record.memoryVerseCompleted
-                            ? 'bg-amber-100 text-amber-900 font-medium'
-                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                        }`}
-                        title="点击切换金句背诵状态"
-                      >
-                        <BookOpen className="w-3 h-3" />
-                        <span>{record.memoryVerseCompleted ? '金句已背诵 ★' : '未背金句'}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {record.notes && (
-                    <span className="text-slate-500 text-[10px] truncate max-w-[120px]" title={record.notes}>
-                      备注: {record.notes}
-                    </span>
-                  )}
+              {/* Notes row if present */}
+              {record && record.notes && (
+                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500 text-[10px] truncate max-w-full" title={record.notes}>
+                    备注: {record.notes}
+                  </span>
                 </div>
               )}
 
@@ -396,7 +492,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1">
                 <button
                   disabled={isLoading}
-                  onClick={() => handleQuickStatus(student.id, 'present', true)}
+                  onClick={() => handleQuickStatus(student.id, 'present')}
                   className={`text-[11px] font-medium px-2 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
                     record?.status === 'present'
                       ? 'bg-emerald-600 text-white'
@@ -409,7 +505,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
                 <button
                   disabled={isLoading}
-                  onClick={() => handleQuickStatus(student.id, 'late', false)}
+                  onClick={() => handleQuickStatus(student.id, 'late')}
                   className={`text-[11px] font-medium px-2 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
                     record?.status === 'late'
                       ? 'bg-amber-600 text-white'

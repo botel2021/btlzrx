@@ -3,7 +3,6 @@ import {
   Award, 
   Printer, 
   Sparkles, 
-  BookOpen, 
   Calendar, 
   CheckCircle2, 
   Clock, 
@@ -12,9 +11,11 @@ import {
   User,
   ChevronRight,
   ShieldCheck,
-  Star
+  Star,
+  Lock,
+  LogIn
 } from 'lucide-react';
-import type { Student, ClassGroup, AttendanceRecord, SystemConfig } from '../types';
+import type { Student, ClassGroup, AttendanceRecord, SystemConfig, AdminUser } from '../types';
 import { getAllSundaysInYear, formatChineseDate } from '../utils/dateUtils';
 
 interface AnnualReportViewProps {
@@ -22,6 +23,8 @@ interface AnnualReportViewProps {
   classes: ClassGroup[];
   students: Student[];
   records: AttendanceRecord[];
+  currentUser: AdminUser | null;
+  onOpenLogin: () => void;
 }
 
 export const AnnualReportView: React.FC<AnnualReportViewProps> = ({
@@ -29,6 +32,8 @@ export const AnnualReportView: React.FC<AnnualReportViewProps> = ({
   classes,
   students,
   records,
+  currentUser,
+  onOpenLogin,
 }) => {
   const [selectedYear, setSelectedYear] = useState<number>(config.currentYear || 2026);
   const [selectedStudentId, setSelectedStudentId] = useState<string>(students[0]?.id || '');
@@ -48,7 +53,6 @@ export const AnnualReportView: React.FC<AnnualReportViewProps> = ({
     const lateCount = studentRecords.filter(r => r.status === 'late').length;
     const excusedCount = studentRecords.filter(r => r.status === 'excused').length;
     const totalAttended = presentCount + lateCount;
-    const verseCount = studentRecords.filter(r => r.memoryVerseCompleted).length;
     
     // Using recorded past sundays count (e.g. 15 past Sundays up to current month) or full year
     const pastSundaysRecorded = Array.from(new Set(yearRecords.map(r => r.date))).length || 15;
@@ -73,7 +77,6 @@ export const AnnualReportView: React.FC<AnnualReportViewProps> = ({
       lateCount,
       excusedCount,
       totalAttended,
-      verseCount,
       rate,
       honorTitle,
       badgeColor,
@@ -87,13 +90,33 @@ export const AnnualReportView: React.FC<AnnualReportViewProps> = ({
   const averageRate = studentAnnualStats.length > 0 
     ? Math.round(studentAnnualStats.reduce((sum, s) => sum + s.rate, 0) / studentAnnualStats.length)
     : 0;
-  const totalVersesYear = studentAnnualStats.reduce((sum, s) => sum + s.verseCount, 0);
 
   const activeStat = studentAnnualStats.find(s => s.student.id === (certificateViewStudent?.id || selectedStudentId)) || studentAnnualStats[0];
 
   const handlePrintCertificate = () => {
     window.print();
   };
+
+  if (!currentUser) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-8 sm:p-12 text-center max-w-lg mx-auto my-8 shadow-xs">
+        <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-7 h-7" />
+        </div>
+        <h3 className="text-base font-bold text-slate-900 mb-2">学员年度成长档案与证书仅供同工查阅</h3>
+        <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+          年度学员名单、出勤榜单及荣誉证书印制涉及学生个人隐私。请使用教师或管理员账号登录后查阅与导出证书。
+        </p>
+        <button
+          onClick={onOpenLogin}
+          className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-2 shadow-xs cursor-pointer"
+        >
+          <LogIn className="w-4 h-4" />
+          <span>主日学老师 / 同工登录</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -169,17 +192,17 @@ export const AnnualReportView: React.FC<AnnualReportViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-200 shadow-2xs">
-          <div className="flex items-center justify-between text-xs text-blue-800 font-medium">
-            <span>年度金句背诵总量</span>
-            <BookOpen className="w-4 h-4 text-blue-600" />
+        <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 shadow-2xs">
+          <div className="flex items-center justify-between text-xs text-emerald-800 font-medium">
+            <span>年度优秀表彰学员</span>
+            <Award className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-blue-800">{totalVersesYear}</span>
-            <span className="text-xs text-blue-600 font-medium">条圣经神圣话语</span>
+            <span className="text-3xl font-bold text-emerald-800">{fullAttendanceCount + excellentCount}</span>
+            <span className="text-xs text-emerald-600 font-medium">位优秀小标兵</span>
           </div>
-          <p className="mt-2 text-[11px] text-blue-700">
-            神的话语藏在孩童心里
+          <p className="mt-2 text-[11px] text-emerald-700">
+            年度出勤率达标 85% 以上
           </p>
         </div>
 
@@ -227,7 +250,6 @@ export const AnnualReportView: React.FC<AnnualReportViewProps> = ({
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
                           <span>已出席 {item.totalAttended} 周</span>
-                          <span className="text-amber-700">★金句 {item.verseCount} 次</span>
                         </div>
                       </div>
                     </div>
@@ -312,9 +334,7 @@ export const AnnualReportView: React.FC<AnnualReportViewProps> = ({
                       <span className="font-semibold text-slate-900">{classes.find(c => c.id === activeStat.student.classId)?.name}</span>{' '}
                       学习期间，风雨无阻、渴慕真理，出勤率达到{' '}
                       <span className="font-bold text-amber-900 font-mono text-sm">{activeStat.rate}%</span>
-                      ，熟记圣经金句{' '}
-                      <span className="font-bold text-blue-900 font-mono text-sm">{activeStat.verseCount}</span>{' '}
-                      条，展现了对神的敬虔与信实。
+                      ，展现了对神的敬虔、忠心与爱心。
                     </p>
                     <p className="font-bold text-sm sm:text-base text-amber-900 py-1">
                       特授予：『 {activeStat.honorTitle} 』

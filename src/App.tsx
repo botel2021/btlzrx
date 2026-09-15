@@ -144,7 +144,7 @@ export default function App() {
       localStorage.removeItem('bethel_admin_user');
     }
     if (activeTab === 'settings') {
-      setActiveTab('qrcode');
+      setActiveTab('today');
     }
     setNewCheckinAlert('已退出后台管理模式');
     setTimeout(() => setNewCheckinAlert(null), 3000);
@@ -152,6 +152,10 @@ export default function App() {
 
   // Handle successful check-in
   const handleCheckinSuccess = (newRecord: AttendanceRecord, student: Student) => {
+    if (!currentUser) {
+      setIsLoginModalOpen(true);
+      return;
+    }
     setRecords(prev => {
       const existing = prev.findIndex(r => r.id === newRecord.id);
       if (existing !== -1) {
@@ -176,6 +180,10 @@ export default function App() {
     offeringCompleted?: boolean;
     notes?: string;
   }) => {
+    if (!currentUser) {
+      setIsLoginModalOpen(true);
+      throw new Error('请先登录教师或管理员账号后再进行签到打卡操作');
+    }
     try {
       const res = await fetch('/api/manual-checkin', {
         method: 'POST',
@@ -508,6 +516,8 @@ export default function App() {
             students={students}
             records={records}
             activeSunday={activeSunday}
+            currentUser={currentUser}
+            onOpenLogin={() => setIsLoginModalOpen(true)}
             onManualUpdate={handleManualUpdate}
           />
         )}
@@ -518,6 +528,8 @@ export default function App() {
             classes={classes}
             students={students}
             records={records}
+            currentUser={currentUser}
+            onOpenLogin={() => setIsLoginModalOpen(true)}
           />
         )}
 
@@ -527,6 +539,8 @@ export default function App() {
             classes={classes}
             students={students}
             records={records}
+            currentUser={currentUser}
+            onOpenLogin={() => setIsLoginModalOpen(true)}
           />
         )}
 
