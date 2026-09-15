@@ -24,11 +24,12 @@ export interface ClassGroup {
   id: string;
   name: string;
   ageRange: string;
-  teacher: string;
-  classroom: string;
+  teacher: string; // 班级负责
+  subjectTeacher?: string; // 任课老师
+  classroom: string; // 活动课室
   color: string;
-  groupType?: GroupType; // 主日学 或 团契
-  targetCapacity?: number; // 设定的学生/团员定额人数
+  groupType?: GroupType; // 班级性质: 主日学 或 团契
+  targetCapacity?: number; // (已取消定额功能，保留以兼容历史字段)
   description?: string;
 }
 

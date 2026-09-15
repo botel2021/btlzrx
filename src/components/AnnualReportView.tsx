@@ -376,7 +376,7 @@ export const AnnualReportView: React.FC<AnnualReportViewProps> = ({
 
                     <div className="text-right space-y-1">
                       <p className="text-[11px] text-slate-500">主日学与团契牧长：</p>
-                      <p className="font-serif font-bold text-slate-800">陈牧师 / 辅导同工</p>
+                      <p className="font-serif font-bold text-slate-800">总管理员 / 班级负责</p>
                       <p className="text-[10px] text-slate-400">证书编号：BTL-{selectedYear}-{activeStat.student.id.slice(-3)}</p>
                     </div>
                   </div>

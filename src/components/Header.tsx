@@ -243,7 +243,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span>后台管理与自定义班级</span>
+            <span>后台班级与学生管理</span>
             {!currentUser ? (
               <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
                 需登录

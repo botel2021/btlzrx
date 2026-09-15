@@ -205,9 +205,15 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
                   <div className="space-y-2 text-xs text-slate-600 my-3.5 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">负责导师/同工：</span>
+                      <span className="text-slate-400">班级负责：</span>
                       <span className="font-semibold text-slate-800">{cls.teacher}</span>
                     </div>
+                    {cls.subjectTeacher && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">任课老师：</span>
+                        <span className="font-semibold text-slate-800">{cls.subjectTeacher}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">活动课室：</span>
                       <span className="font-semibold text-slate-800">{cls.classroom}</span>
@@ -215,7 +221,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">在册学员规模：</span>
                       <span className="font-semibold text-amber-800 font-mono">
-                        {classStudentCount} 人 <span className="text-slate-400 font-normal">（班级定额 {cls.targetCapacity || 20} 人）</span>
+                        {classStudentCount} 人
                       </span>
                     </div>
                   </div>
@@ -230,7 +236,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                   <span className="text-[11px] text-slate-400 flex items-center gap-1">
                     <Lock className="w-3 h-3 text-slate-400" />
-                    <span>学生花名册仅登录可见</span>
+                    <span>学生资料仅登录可见</span>
                   </span>
                   <button
                     onClick={onOpenLogin}

@@ -16,10 +16,10 @@ const initialClasses: ClassGroup[] = [
     name: '小小班', 
     ageRange: '2-3岁', 
     teacher: '李路得 老师', 
+    subjectTeacher: '陈约瑟 老师',
     classroom: '副堂101课室', 
     color: 'bg-emerald-500',
     groupType: 'sunday_school',
-    targetCapacity: 15,
     description: '小小班启蒙，圣经故事与赞美诗律动'
   },
   { 
@@ -27,10 +27,10 @@ const initialClasses: ClassGroup[] = [
     name: '小班', 
     ageRange: '3-4岁', 
     teacher: '张爱华 老师', 
+    subjectTeacher: '王信实 老师',
     classroom: '副堂102课室', 
     color: 'bg-teal-500',
     groupType: 'sunday_school',
-    targetCapacity: 18,
     description: '幼儿诗歌、圣经小品格与常规模范'
   },
   { 
@@ -38,10 +38,10 @@ const initialClasses: ClassGroup[] = [
     name: '中班', 
     ageRange: '4-5岁', 
     teacher: '王恩典 老师', 
+    subjectTeacher: '刘喜乐 老师',
     classroom: '副堂201课室', 
     color: 'bg-amber-500',
     groupType: 'sunday_school',
-    targetCapacity: 20,
     description: '主日学中班，研读神造万物与感恩顺服'
   },
   { 
@@ -49,10 +49,10 @@ const initialClasses: ClassGroup[] = [
     name: '大班', 
     ageRange: '5-6岁', 
     teacher: '张大卫 老师', 
+    subjectTeacher: '周和平 老师',
     classroom: '副堂202课室', 
     color: 'bg-orange-500',
     groupType: 'sunday_school',
-    targetCapacity: 22,
     description: '幼小衔接班，研读圣经品格与敬拜学习'
   },
   { 
@@ -60,10 +60,10 @@ const initialClasses: ClassGroup[] = [
     name: '初中班', 
     ageRange: '12-14岁', 
     teacher: '王提摩太 传道', 
+    subjectTeacher: '赵忍耐 老师',
     classroom: '宣教楼301室', 
     color: 'bg-blue-500',
     groupType: 'sunday_school',
-    targetCapacity: 25,
     description: '初中学生班，圣经真理根基、门徒训练与少年团契'
   },
   { 
@@ -71,10 +71,10 @@ const initialClasses: ClassGroup[] = [
     name: '高中班', 
     ageRange: '15-17岁', 
     teacher: '陈保罗 同工', 
+    subjectTeacher: '孙恩慈 老师',
     classroom: '宣教楼302室', 
     color: 'bg-indigo-500',
     groupType: 'sunday_school',
-    targetCapacity: 25,
     description: '高中门徒，圣经世界观、信仰思辨与基督徒侍奉实践'
   },
   { 
@@ -82,10 +82,10 @@ const initialClasses: ClassGroup[] = [
     name: '以斯拉团契', 
     ageRange: '18-35岁', 
     teacher: '林腓利 同工', 
+    subjectTeacher: '钱良善 老师',
     classroom: '多功能青年活动厅', 
     color: 'bg-purple-500',
     groupType: 'fellowship',
-    targetCapacity: 30,
     description: '青年团契，职场得胜见证、诗歌敬拜与专案服侍'
   },
   { 
@@ -93,10 +93,10 @@ const initialClasses: ClassGroup[] = [
     name: '雅歌团契', 
     ageRange: '家庭与成年', 
     teacher: '赵彼得 长老', 
+    subjectTeacher: '吴忠信 老师',
     classroom: '伯特利副堂恩慈厅', 
     color: 'bg-rose-500',
     groupType: 'fellowship',
-    targetCapacity: 35,
     description: '成年与家庭团契，夫妻建造、彼此代祷与互助团契'
   }
 ];
@@ -598,7 +598,7 @@ app.post('/api/batch-checkin', (req, res) => {
   }
 });
 
-// 6. Manage Classes (自定义班级/团契名称、辅导老师、人数定额) - 仅限总管理员
+// 6. Manage Classes (自定义班级/团契名称、班级负责、任课老师) - 仅限总管理员
 app.post('/api/classes', (req, res) => {
   try {
     const auth = verifySuperAdminPermission(req);
@@ -606,7 +606,7 @@ app.post('/api/classes', (req, res) => {
       return res.status(403).json({ error: auth.message });
     }
 
-    const { id, name, ageRange, teacher, classroom, color, groupType, targetCapacity, description } = req.body;
+    const { id, name, ageRange, teacher, subjectTeacher, classroom, color, groupType, description } = req.body;
     if (!name) {
       return res.status(400).json({ error: '班级/团契名称为必填项' });
     }
@@ -619,10 +619,10 @@ app.post('/api/classes', (req, res) => {
           name,
           ageRange: ageRange || classes[idx].ageRange,
           teacher: teacher || classes[idx].teacher,
+          subjectTeacher: subjectTeacher !== undefined ? subjectTeacher : classes[idx].subjectTeacher,
           classroom: classroom || classes[idx].classroom,
           color: color || classes[idx].color,
           groupType: groupType || classes[idx].groupType || 'sunday_school',
-          targetCapacity: Number(targetCapacity) || classes[idx].targetCapacity || 20,
           description: description !== undefined ? description : classes[idx].description
         };
         return res.json({ success: true, class: classes[idx], message: '班级信息修改成功' });
@@ -633,11 +633,11 @@ app.post('/api/classes', (req, res) => {
       id: `class-${Date.now().toString().slice(-6)}`,
       name,
       ageRange: ageRange || '自选年龄段',
-      teacher: teacher || '教务老师',
-      classroom: classroom || '主堂副室',
+      teacher: teacher || '班级负责人',
+      subjectTeacher: subjectTeacher || '任课老师',
+      classroom: classroom || '主堂教室',
       color: color || 'bg-amber-500',
       groupType: groupType || 'sunday_school',
-      targetCapacity: Number(targetCapacity) || 20,
       description: description || ''
     };
     classes.push(newClass);

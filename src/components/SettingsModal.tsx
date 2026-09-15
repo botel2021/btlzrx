@@ -148,11 +148,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setEditingClass({
       name: '',
       ageRange: '6-12岁',
-      teacher: '主日学老师',
+      teacher: '',
+      subjectTeacher: '',
       classroom: '伯特利副堂',
       color: 'bg-amber-500',
       groupType: 'sunday_school',
-      targetCapacity: 20,
       description: ''
     });
     setIsClassModalOpen(true);
@@ -411,7 +411,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            自定义班级与团契名称、调整学员人数与定额容量、掌控各项默认选项的开启与关闭
+            自定义班级与团契名称、配置班级负责与任课老师、学生资料登记管理与功能开关中心
           </p>
         </div>
 
@@ -478,7 +478,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <p className="text-[11px] text-amber-800/90 mt-0.5 leading-relaxed">
                 按照系统权限配置：<strong>除了总管理员之外，其他账号只有管理签到权限，没有添加/删除班级与学生的权限。</strong>
-                如需新增班级、编辑班级定额、批量录入学员或移出学员，请切换使用总管理员账号登录。
+                如需新增班级、编辑班级与任课信息、批量录入学员或移出学员，请切换使用总管理员账号登录。
               </p>
             </div>
           </div>
@@ -519,7 +519,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           }`}
         >
           <Church className="w-3.5 h-3.5" />
-          <span>班级与团契管理 (自定义名称与人数定额)</span>
+          <span>班级与团契管理 (班级与任课设置)</span>
         </button>
 
         <button
@@ -531,7 +531,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           }`}
         >
           <Users className="w-3.5 h-3.5" />
-          <span>学员花名册与人数扩充 (批量与单人录入)</span>
+          <span>学生资料登记管理 (批量与单人录入)</span>
         </button>
 
         <button
@@ -560,13 +560,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* SUB-TAB 1: CLASSES MANAGEMENT (自定义班级名称与学生人数定额) */}
+      {/* SUB-TAB 1: CLASSES MANAGEMENT (自定义班级名称与班级负责、任课老师) */}
       {/* ========================================================================= */}
       {activeSubTab === 'classes' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-xs text-slate-500">
-              共配置 <span className="font-bold text-slate-900">{classes.length}</span> 个班级/团契。可随时查看班名、辅导老师与定额人数。
+              共配置 <span className="font-bold text-slate-900">{classes.length}</span> 个班级/团契。可随时查看班名、班级负责、任课老师与活动课室。
             </div>
             {isSuperAdmin ? (
               <button
@@ -587,8 +587,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {classes.map(cls => {
               const enrolledCount = students.filter(s => s.classId === cls.id).length;
-              const targetCap = cls.targetCapacity || 20;
-              const ratio = Math.min(Math.round((enrolledCount / targetCap) * 100), 100);
               const isSundaySchool = cls.groupType !== 'fellowship';
 
               return (
@@ -638,10 +636,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
 
                     {/* Meta info */}
-                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs space-y-1 text-slate-600">
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs space-y-1.5 text-slate-600">
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-400">辅导同工/老师:</span>
+                        <span className="text-slate-400">班级负责:</span>
                         <span className="font-semibold text-slate-800">{cls.teacher}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">任课老师:</span>
+                        <span className="font-semibold text-slate-800">{cls.subjectTeacher || '未设定'}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-400">活动课室:</span>
@@ -653,26 +655,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Capacity and Enrolled progress */}
-                    <div>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-slate-500 font-medium">学生人数规模:</span>
-                        <span className="font-bold text-slate-900">
-                          {enrolledCount} <span className="font-normal text-slate-400">/ 设额 {targetCap} 人</span>
-                        </span>
-                      </div>
-                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            isSundaySchool ? 'bg-amber-600' : 'bg-purple-600'
-                          }`}
-                          style={{ width: `${ratio}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
-                        <span>定额容量达成: {ratio}%</span>
-                        <span className="text-amber-800 font-medium">{enrolledCount >= targetCap ? '已满员' : `尚余 ${targetCap - enrolledCount} 名额`}</span>
-                      </div>
+                    {/* Enrolled students */}
+                    <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100/80 flex items-center justify-between text-xs">
+                      <span className="text-slate-600 font-medium">在册学生人数:</span>
+                      <span className="font-bold text-amber-900 font-mono text-sm">
+                        {enrolledCount} <span className="text-xs font-normal text-slate-500">人</span>
+                      </span>
                     </div>
                   </div>
 
@@ -1026,7 +1014,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                   <ul className="text-[11px] text-slate-500 pl-5 space-y-1 list-disc leading-relaxed">
                     <li>在「今日主日签到」页面进行实时打卡与请假登记</li>
-                    <li>随时查阅左侧学员花名册与班级定额达成率</li>
+                    <li>随时查阅左侧学生资料登记与班级考勤情况</li>
                     <li>查阅月度全勤表与年度结业荣誉档案</li>
                   </ul>
                 </div>
@@ -1353,7 +1341,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* EDIT / NEW CLASS MODAL (自定义班级名称与定额人数弹窗) */}
+      {/* EDIT / NEW CLASS MODAL (自定义班级名称、班级负责与任课老师弹窗) */}
       {/* ========================================================================= */}
       {isClassModalOpen && editingClass && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -1365,7 +1353,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {editingClass.id ? '编辑班级/团契信息' : '创建新班级 / 团契'}
                 </h3>
                 <p className="text-xs text-amber-200 mt-0.5">
-                  自定义班级名称、类别、年龄段及目标学员人数规模
+                  自定义班级名称、班级性质、班级负责、任课老师与活动课室
                 </p>
               </div>
               <button
@@ -1391,7 +1379,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   required
                   value={editingClass.name || ''}
                   onChange={e => setEditingClass({ ...editingClass, name: e.target.value })}
-                  placeholder="例如: 恩典约书亚班 (6-8岁初小)"
+                  placeholder="例如: 小小班、初中班、以斯拉团契"
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
@@ -1399,7 +1387,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    组织性质
+                    班级性质 *
                   </label>
                   <select
                     value={editingClass.groupType || 'sunday_school'}
@@ -1413,15 +1401,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    设定学生人数定额 (容量上限) *
+                    适配年龄段
                   </label>
                   <input
-                    type="number"
-                    min={1}
-                    max={200}
-                    required
-                    value={editingClass.targetCapacity || 20}
-                    onChange={e => setEditingClass({ ...editingClass, targetCapacity: Number(e.target.value) })}
+                    type="text"
+                    value={editingClass.ageRange || ''}
+                    onChange={e => setEditingClass({ ...editingClass, ageRange: e.target.value })}
+                    placeholder="例如: 3-4岁、12-14岁"
                     className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
                   />
                 </div>
@@ -1430,26 +1416,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    辅导老师 / 带领同工
+                    班级负责 *
                   </label>
                   <input
                     type="text"
+                    required
                     value={editingClass.teacher || ''}
                     onChange={e => setEditingClass({ ...editingClass, teacher: e.target.value })}
-                    placeholder="例如: 张大卫 老师"
+                    placeholder="例如: 李路得 老师"
                     className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    活动课室 / 聚会地点
+                    任课老师
                   </label>
                   <input
                     type="text"
-                    value={editingClass.classroom || ''}
-                    onChange={e => setEditingClass({ ...editingClass, classroom: e.target.value })}
-                    placeholder="例如: 副堂202室"
+                    value={editingClass.subjectTeacher || ''}
+                    onChange={e => setEditingClass({ ...editingClass, subjectTeacher: e.target.value })}
+                    placeholder="例如: 陈约瑟 老师"
                     className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
                   />
                 </div>
@@ -1457,13 +1444,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  年龄段范围
+                  活动课室
                 </label>
                 <input
                   type="text"
-                  value={editingClass.ageRange || ''}
-                  onChange={e => setEditingClass({ ...editingClass, ageRange: e.target.value })}
-                  placeholder="例如: 6-8岁"
+                  value={editingClass.classroom || ''}
+                  onChange={e => setEditingClass({ ...editingClass, classroom: e.target.value })}
+                  placeholder="例如: 副堂101课室、宣教楼301室"
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
                 />
               </div>

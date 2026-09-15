@@ -56,6 +56,23 @@ export function getLocalData() {
       localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
       localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
       localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(refreshedRecords));
+    } else {
+      // Ensure subjectTeacher is populated
+      let hasUpdatedClasses = false;
+      classes = classes.map(c => {
+        if (!c.subjectTeacher) {
+          hasUpdatedClasses = true;
+          const match = initialClasses.find(ic => ic.id === c.id || ic.name === c.name);
+          return {
+            ...c,
+            subjectTeacher: match?.subjectTeacher || '主日学专职老师'
+          };
+        }
+        return c;
+      });
+      if (hasUpdatedClasses) {
+        localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
+      }
     }
 
     const rawConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);

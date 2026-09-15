@@ -311,11 +311,11 @@ export default function App() {
           id: `class-${Date.now()}`,
           name: classData.name || '新班级',
           ageRange: classData.ageRange || '3-12岁',
-          teacher: classData.teacher || '主日学老师',
+          teacher: classData.teacher || '班级负责人',
+          subjectTeacher: classData.subjectTeacher || '任课老师',
           classroom: classData.classroom || '主堂教室',
           color: classData.color || 'bg-amber-500',
           groupType: classData.groupType || 'sunday_school',
-          targetCapacity: classData.targetCapacity || 20,
           description: classData.description || ''
         };
         updated = [...prev, newClass];
