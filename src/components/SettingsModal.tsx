@@ -25,7 +25,9 @@ import {
   Calendar,
   Loader2,
   Lock,
-  ShieldAlert
+  ShieldAlert,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import type { SystemConfig, Student, ClassGroup, AdminUser } from '../types';
 import { calculateAge, formatBirthDate, getDefaultBirthDateForAge } from '../utils/studentUtils';
@@ -153,7 +155,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       classroom: '伯特利副堂',
       color: 'bg-amber-500',
       groupType: 'sunday_school',
-      description: ''
+      description: '',
+      isHiddenFromHome: false
     });
     setIsClassModalOpen(true);
   };
@@ -163,8 +166,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       showNotice('error', '权限受限：除了总管理员之外，其他账号只有管理签到权限，没有编辑班级的权限！');
       return;
     }
-    setEditingClass({ ...cls });
+    setEditingClass({ ...cls, isHiddenFromHome: cls.isHiddenFromHome || false });
     setIsClassModalOpen(true);
+  };
+
+  // Quick toggle class visibility on home page
+  const handleToggleClassHomeVisibility = async (cls: ClassGroup) => {
+    if (!isSuperAdmin) {
+      showNotice('error', '权限受限：除了总管理员之外，其他账号没有修改班级首页展示状态的权限！');
+      return;
+    }
+    const targetStatus = !cls.isHiddenFromHome;
+    try {
+      await onSaveClass({ ...cls, isHiddenFromHome: targetStatus });
+      showNotice(
+        'success',
+        `班级【${cls.name}】已成功设置为：首页${targetStatus ? '隐藏' : '显示'}！`
+      );
+    } catch (err: any) {
+      showNotice('error', err.message || '设置首页展示状态失败');
+    }
   };
 
   const handleSaveClassSubmit = async (e: React.FormEvent) => {
@@ -598,13 +619,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {/* Header line */}
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mb-1.5 ${
-                          isSundaySchool 
-                            ? 'bg-amber-50 text-amber-900 border-amber-200'
-                            : 'bg-purple-50 text-purple-900 border-purple-200'
-                        }`}>
-                          {isSundaySchool ? '主日学班级' : '团契契组'}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                          <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            isSundaySchool 
+                              ? 'bg-amber-50 text-amber-900 border-amber-200'
+                              : 'bg-purple-50 text-purple-900 border-purple-200'
+                          }`}>
+                            {isSundaySchool ? '主日学班级' : '团契契组'}
+                          </span>
+                          {cls.isHiddenFromHome ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                              <EyeOff className="w-2.5 h-2.5 text-slate-400" />
+                              <span>首页隐藏</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <Eye className="w-2.5 h-2.5 text-emerald-600" />
+                              <span>首页显示</span>
+                            </span>
+                          )}
+                        </div>
                         <h4 className="text-sm font-bold text-slate-900 font-serif leading-tight">
                           {cls.name}
                         </h4>
@@ -612,6 +646,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                       {isSuperAdmin ? (
                         <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleToggleClassHomeVisibility(cls)}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              cls.isHiddenFromHome 
+                                ? 'text-amber-800 bg-amber-50 hover:bg-amber-100' 
+                                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                            }`}
+                            title={cls.isHiddenFromHome ? '该班级在首页已隐藏，点击设为显示' : '该班级在首页正常显示，点击设为隐藏'}
+                          >
+                            {cls.isHiddenFromHome ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
                           <button
                             onClick={() => handleOpenEditClass(cls)}
                             className="p-1.5 text-slate-400 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
@@ -661,6 +706,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <span className="font-bold text-amber-900 font-mono text-sm">
                         {enrolledCount} <span className="text-xs font-normal text-slate-500">人</span>
                       </span>
+                    </div>
+
+                    {/* Home Visibility Control Bar */}
+                    <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-slate-400 text-[11px]">首页展示:</span>
+                        <span className={`text-[11px] font-semibold flex items-center gap-1 ${
+                          cls.isHiddenFromHome ? 'text-amber-800' : 'text-emerald-700'
+                        }`}>
+                          {cls.isHiddenFromHome ? (
+                            <>
+                              <EyeOff className="w-3 h-3 text-amber-700" />
+                              <span>已在首页隐藏</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3 h-3 text-emerald-600" />
+                              <span>在首页显示中</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      {isSuperAdmin ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleClassHomeVisibility(cls)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border ${
+                            cls.isHiddenFromHome
+                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                              : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border-slate-200'
+                          }`}
+                          title={cls.isHiddenFromHome ? '点击恢复在首页展示' : '点击在首页隐藏该班级'}
+                        >
+                          {cls.isHiddenFromHome ? (
+                            <>
+                              <Eye className="w-3.5 h-3.5 text-amber-800" />
+                              <span>设为显示</span>
+                            </>
+                          ) : (
+                            <>
+                              <EyeOff className="w-3.5 h-3.5 text-slate-500" />
+                              <span>设为隐藏</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <Lock className="w-3 h-3 text-slate-400" />
+                          <span>仅管理员可切换</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1127,41 +1224,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
-            {/* 3. 奉献打卡开关 */}
-            <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
-                    3
-                  </span>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    是否开启主日「奉献」打卡项
-                  </h4>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  开启后，签到卡片可标记学员是否参与主日奉献。
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggleOption('enableOfferingOption', !optionsState.enableOfferingOption)}
-                className="cursor-pointer shrink-0"
-              >
-                {optionsState.enableOfferingOption ? (
-                  <ToggleRight className="w-9 h-9 text-amber-700" />
-                ) : (
-                  <ToggleLeft className="w-9 h-9 text-slate-300" />
-                )}
-              </button>
-            </div>
-
-            {/* 4. 测试模式开关 */}
+            {/* 3. 测试模式开关 */}
             <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/50 flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  <h4 className="text-xs font-bold text-slate-900">
-                    测试/演练模式 (任意时间允许签到)
+                  <span className="w-6 h-6 rounded-lg bg-amber-200/80 text-amber-900 flex items-center justify-center font-bold text-xs">
+                    3
+                  </span>
+                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <span>测试/演练模式 (任意时间允许签到)</span>
                   </h4>
                 </div>
                 <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
@@ -1181,12 +1253,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
-            {/* 5. 大屏悬浮弹窗喜报开关 */}
+            {/* 4. 大屏悬浮弹窗喜报开关 */}
             <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
-                    5
+                    4
                   </span>
                   <h4 className="text-xs font-bold text-slate-900">
                     大屏实时签到悬浮喜报
@@ -1466,6 +1538,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   placeholder="一句话介绍班级特色与教学内容"
                   className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
                 />
+              </div>
+
+              {/* 首页展示状态设置 */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  首页展示状态 *
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingClass({ ...editingClass, isHiddenFromHome: false })}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      !editingClass.isHiddenFromHome
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>首页显示 (正常)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingClass({ ...editingClass, isHiddenFromHome: true })}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      editingClass.isHiddenFromHome
+                        ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-2xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <EyeOff className="w-3.5 h-3.5 text-amber-700" />
+                    <span>首页隐藏</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  设为“首页隐藏”后，该班级将不会出现在访客总览及首页签到快捷栏中。
+                </p>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">

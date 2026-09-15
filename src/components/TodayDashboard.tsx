@@ -59,9 +59,15 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
   // Today's records
   const todayRecords = records.filter(r => r.date === activeSunday);
 
+  // Filter visible classes for the home page (respects isHiddenFromHome)
+  const visibleClasses = classes.filter(c => !c.isHiddenFromHome);
+  const visibleClassIdSet = new Set(visibleClasses.map(c => c.id));
+  const homeStudents = students.filter(s => visibleClassIdSet.has(s.classId));
+
   // Filter students
   const filteredStudents = students.filter(student => {
-    const matchClass = selectedClassId === 'all' || student.classId === selectedClassId;
+    const inVisibleClass = visibleClassIdSet.has(student.classId);
+    const matchClass = selectedClassId === 'all' ? inVisibleClass : student.classId === selectedClassId;
     const matchSearch = searchKeyword.trim() === '' || 
       student.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
       student.parentPhone.includes(searchKeyword) ||
@@ -69,13 +75,19 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
     return matchClass && matchSearch;
   });
 
-  // Calculate statistics
-  const totalCount = students.length;
-  const presentCount = todayRecords.filter(r => r.status === 'present').length;
-  const lateCount = todayRecords.filter(r => r.status === 'late').length;
-  const excusedCount = todayRecords.filter(r => r.status === 'excused').length;
+  // Calculate statistics (scoped to visible classes on home page)
+  const activeScopeStudents = selectedClassId === 'all' 
+    ? homeStudents 
+    : students.filter(s => s.classId === selectedClassId);
+  const totalCount = activeScopeStudents.length;
+  const activeScopeStudentIds = new Set(activeScopeStudents.map(s => s.id));
+  const scopedTodayRecords = todayRecords.filter(r => activeScopeStudentIds.has(r.studentId));
+
+  const presentCount = scopedTodayRecords.filter(r => r.status === 'present').length;
+  const lateCount = scopedTodayRecords.filter(r => r.status === 'late').length;
+  const excusedCount = scopedTodayRecords.filter(r => r.status === 'excused').length;
   const checkedInTotal = presentCount + lateCount;
-  const absentCount = totalCount - checkedInTotal - excusedCount;
+  const absentCount = Math.max(0, totalCount - checkedInTotal - excusedCount);
   const attendanceRate = totalCount > 0 ? Math.round((checkedInTotal / totalCount) * 100) : 0;
 
   const handleQuickStatus = async (
@@ -160,7 +172,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Church className="w-5 h-5 text-amber-700" />
-              <span>主日学与团契班级总览（共 {classes.length} 个班级）</span>
+              <span>主日学与团契班级总览（共 {visibleClasses.length} 个班级）</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               各年龄段班级宗旨、适龄标准、活动教室与负责同工介绍
@@ -170,7 +182,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
 
         {/* Class Cards Grid (Strictly no student names or personal data) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classes.map(cls => {
+          {visibleClasses.map(cls => {
             const classStudentCount = students.filter(s => s.classId === cls.id).length;
             const isFellowship = cls.groupType === 'fellowship';
 
@@ -219,7 +231,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
                       <span className="font-semibold text-slate-800">{cls.classroom}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">在册学员规模：</span>
+                      <span className="text-slate-400">学员规模：</span>
                       <span className="font-semibold text-amber-800 font-mono">
                         {classStudentCount} 人
                       </span>
@@ -361,11 +373,11 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
                 selectedClassId === 'all' ? 'bg-amber-800 text-amber-100' : 'bg-slate-200/80 text-slate-600'
               }`}>
-                {todayRecords.filter(r => r.status === 'present' || r.status === 'late').length}/{students.length}人
+                {todayRecords.filter(r => (r.status === 'present' || r.status === 'late') && visibleClassIdSet.has(r.classId)).length}/{homeStudents.length}人
               </span>
             </button>
 
-            {classes.map(cls => {
+            {visibleClasses.map(cls => {
               const clsStudentCount = students.filter(s => s.classId === cls.id).length;
               const clsPresentCount = todayRecords.filter(r => r.classId === cls.id && (r.status === 'present' || r.status === 'late')).length;
               const isSelected = selectedClassId === cls.id;

@@ -31,6 +31,7 @@ export interface ClassGroup {
   groupType?: GroupType; // 班级性质: 主日学 或 团契
   targetCapacity?: number; // (已取消定额功能，保留以兼容历史字段)
   description?: string;
+  isHiddenFromHome?: boolean; // 首页是否隐藏 (true 为在首页隐藏，false 或 undefined 为在首页显示)
 }
 
 export interface AttendanceRecord {

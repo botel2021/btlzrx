@@ -316,7 +316,8 @@ export default function App() {
           classroom: classData.classroom || '主堂教室',
           color: classData.color || 'bg-amber-500',
           groupType: classData.groupType || 'sunday_school',
-          description: classData.description || ''
+          description: classData.description || '',
+          isHiddenFromHome: !!classData.isHiddenFromHome
         };
         updated = [...prev, newClass];
       }

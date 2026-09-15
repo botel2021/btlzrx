@@ -598,7 +598,7 @@ app.post('/api/batch-checkin', (req, res) => {
   }
 });
 
-// 6. Manage Classes (自定义班级/团契名称、班级负责、任课老师) - 仅限总管理员
+// 6. Manage Classes (自定义班级/团契名称、班级负责、任课老师、首页显示/隐藏) - 仅限总管理员
 app.post('/api/classes', (req, res) => {
   try {
     const auth = verifySuperAdminPermission(req);
@@ -606,7 +606,7 @@ app.post('/api/classes', (req, res) => {
       return res.status(403).json({ error: auth.message });
     }
 
-    const { id, name, ageRange, teacher, subjectTeacher, classroom, color, groupType, description } = req.body;
+    const { id, name, ageRange, teacher, subjectTeacher, classroom, color, groupType, description, isHiddenFromHome } = req.body;
     if (!name) {
       return res.status(400).json({ error: '班级/团契名称为必填项' });
     }
@@ -623,7 +623,8 @@ app.post('/api/classes', (req, res) => {
           classroom: classroom || classes[idx].classroom,
           color: color || classes[idx].color,
           groupType: groupType || classes[idx].groupType || 'sunday_school',
-          description: description !== undefined ? description : classes[idx].description
+          description: description !== undefined ? description : classes[idx].description,
+          isHiddenFromHome: isHiddenFromHome !== undefined ? !!isHiddenFromHome : (classes[idx].isHiddenFromHome || false),
         };
         return res.json({ success: true, class: classes[idx], message: '班级信息修改成功' });
       }
@@ -638,7 +639,8 @@ app.post('/api/classes', (req, res) => {
       classroom: classroom || '主堂教室',
       color: color || 'bg-amber-500',
       groupType: groupType || 'sunday_school',
-      description: description || ''
+      description: description || '',
+      isHiddenFromHome: !!isHiddenFromHome,
     };
     classes.push(newClass);
     res.json({ success: true, class: newClass, message: '成功新增班级/团契' });
