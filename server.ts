@@ -185,11 +185,22 @@ let systemConfig: SystemConfig = {
 };
 
 // Preset Admin Accounts for Bethel Church
-const presetAdmins: AdminUser[] = [
-  { username: 'admin', displayName: '伯特利教会 • 总管理员', role: 'superadmin' },
-  { username: 'teacher', displayName: '主日学主班教务老师', role: 'teacher' },
-  { username: 'fellowship', displayName: '团契带领同工', role: 'fellowship_leader' }
+interface ServerAdminAccount {
+  id: string;
+  username: string;
+  displayName: string;
+  role: 'superadmin' | 'teacher' | 'fellowship_leader';
+  password: string;
+  createdAt: string;
+}
+
+let adminAccounts: ServerAdminAccount[] = [
+  { id: 'acc-admin', username: 'admin', displayName: '伯特利教会 • 总管理员', role: 'superadmin', password: 'bethel2026', createdAt: '2026-01-01' },
+  { id: 'acc-teacher', username: 'teacher', displayName: '主日学主班教务老师', role: 'teacher', password: 'bethel123', createdAt: '2026-01-01' },
+  { id: 'acc-fellowship', username: 'fellowship', displayName: '团契带领同工', role: 'fellowship_leader', password: 'fellowship123', createdAt: '2026-01-01' }
 ];
+
+const presetAdmins: AdminUser[] = adminAccounts;
 
 // Active sessions storage
 const activeSessions = new Map<string, AdminUser>();
@@ -371,6 +382,13 @@ app.get('/api/state', (req, res) => {
     classes,
     students,
     records,
+    accounts: adminAccounts.map(a => ({
+      id: a.id,
+      username: a.username,
+      displayName: a.displayName,
+      role: a.role,
+      createdAt: a.createdAt
+    })),
     activeSunday,
     serverTime: new Date().toISOString()
   });
@@ -385,25 +403,28 @@ app.post('/api/login', (req, res) => {
     }
 
     const trimmedUser = String(username).trim();
-    const targetAdmin = presetAdmins.find(a => a.username.toLowerCase() === trimmedUser.toLowerCase());
+    const cleanPassword = String(password).trim();
+    const targetAccount = adminAccounts.find(a => a.username.toLowerCase() === trimmedUser.toLowerCase());
 
-    // Check against configured admin password or preset password
-    const validPasswords = [systemConfig.adminPassword || 'bethel2026', 'bethel123', 'fellowship123'];
-    const isPasswordValid = validPasswords.includes(password) || password === 'bethel2026';
+    if (targetAccount) {
+      const isMatch = targetAccount.password === cleanPassword ||
+        (targetAccount.role === 'superadmin' && cleanPassword === (systemConfig.adminPassword || 'bethel2026'));
 
-    if (targetAdmin && isPasswordValid) {
-      const userSession: AdminUser = {
-        username: targetAdmin.username,
-        displayName: targetAdmin.displayName,
-        role: targetAdmin.role,
-        token: `btl_session_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
-      };
-      activeSessions.set(userSession.token, userSession);
-      return res.json({ success: true, user: userSession, message: `欢迎登录，${userSession.displayName}！` });
+      if (isMatch) {
+        const userSession: AdminUser = {
+          username: targetAccount.username,
+          displayName: targetAccount.displayName,
+          role: targetAccount.role,
+          token: `btl_session_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+        };
+        activeSessions.set(userSession.token, userSession);
+        return res.json({ success: true, user: userSession, message: `欢迎登录，${userSession.displayName}！` });
+      }
+      return res.status(401).json({ error: '密码错误，请核对后重试' });
     }
 
     // Generic match if user enters custom username with correct admin password
-    if (password === (systemConfig.adminPassword || 'bethel2026')) {
+    if (cleanPassword === (systemConfig.adminPassword || 'bethel2026')) {
       const userSession: AdminUser = {
         username: trimmedUser,
         displayName: `伯特利教会管理员 (${trimmedUser})`,
@@ -414,7 +435,7 @@ app.post('/api/login', (req, res) => {
       return res.json({ success: true, user: userSession, message: '登录成功！' });
     }
 
-    return res.status(401).json({ error: '用户名或密码错误，请检查（默认管理员密码：bethel2026）' });
+    return res.status(401).json({ error: '账号不存在或密码错误，请核对后重试' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -852,6 +873,179 @@ app.post('/api/reset-data', (req, res) => {
     };
     generateMockHistoricalRecords();
     res.json({ success: true, message: '已重置为伯特利教会主日学与团契官方示范数据' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10. Account Management - 仅限总管理员
+// 10.1 Get all accounts
+app.get('/api/accounts', (req, res) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message || '仅总管理员有权限管理后台账号' });
+    }
+
+    res.json({
+      success: true,
+      accounts: adminAccounts.map(a => ({
+        id: a.id,
+        username: a.username,
+        displayName: a.displayName,
+        role: a.role,
+        createdAt: a.createdAt
+      }))
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10.2 Create or Update account
+app.post('/api/accounts', (req, res) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message || '仅总管理员有权限添加或修改账号' });
+    }
+
+    const { username, displayName, role, password } = req.body;
+    if (!username || !displayName) {
+      return res.status(400).json({ error: '用户名和显示称谓不能为空' });
+    }
+
+    const cleanUsername = String(username).trim().toLowerCase();
+    const cleanDisplayName = String(displayName).trim();
+    const cleanRole = (role === 'superadmin' || role === 'teacher' || role === 'fellowship_leader') 
+      ? role 
+      : 'teacher';
+
+    const existingIndex = adminAccounts.findIndex(a => a.username.toLowerCase() === cleanUsername);
+
+    if (existingIndex >= 0) {
+      // Update existing
+      const existing = adminAccounts[existingIndex];
+      // Keep root admin as superadmin
+      const finalRole = cleanUsername === 'admin' ? 'superadmin' : cleanRole;
+      
+      adminAccounts[existingIndex] = {
+        ...existing,
+        displayName: cleanDisplayName,
+        role: finalRole,
+        password: password ? String(password).trim() : existing.password
+      };
+
+      if (cleanUsername === 'admin' && password) {
+        systemConfig.adminPassword = String(password).trim();
+      }
+
+      return res.json({
+        success: true,
+        message: `账号【${cleanUsername}】信息已成功更新！`,
+        account: {
+          id: adminAccounts[existingIndex].id,
+          username: adminAccounts[existingIndex].username,
+          displayName: adminAccounts[existingIndex].displayName,
+          role: adminAccounts[existingIndex].role,
+          createdAt: adminAccounts[existingIndex].createdAt
+        }
+      });
+    } else {
+      // Create new
+      if (!password || String(password).trim().length < 4) {
+        return res.status(400).json({ error: '新建账号密码不能为空且不少于4位字符' });
+      }
+
+      const newAccount: ServerAdminAccount = {
+        id: `acc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        username: cleanUsername,
+        displayName: cleanDisplayName,
+        role: cleanRole,
+        password: String(password).trim(),
+        createdAt: new Date().toISOString().split('T')[0]
+      };
+
+      adminAccounts.push(newAccount);
+
+      return res.json({
+        success: true,
+        message: `新账号【${cleanUsername}】已成功创建！`,
+        account: {
+          id: newAccount.id,
+          username: newAccount.username,
+          displayName: newAccount.displayName,
+          role: newAccount.role,
+          createdAt: newAccount.createdAt
+        }
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10.3 Change password for an account
+app.post('/api/accounts/password', (req, res) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message || '仅总管理员有权限修改账号密码' });
+    }
+
+    const { username, newPassword } = req.body;
+    if (!username || !newPassword) {
+      return res.status(400).json({ error: '请提供用户名和新密码' });
+    }
+
+    const cleanUsername = String(username).trim().toLowerCase();
+    const cleanPassword = String(newPassword).trim();
+    if (cleanPassword.length < 4) {
+      return res.status(400).json({ error: '新密码长度至少需要4个字符' });
+    }
+
+    const target = adminAccounts.find(a => a.username.toLowerCase() === cleanUsername);
+    if (!target) {
+      return res.status(404).json({ error: `未找到账号【${username}】` });
+    }
+
+    target.password = cleanPassword;
+    if (cleanUsername === 'admin') {
+      systemConfig.adminPassword = cleanPassword;
+    }
+
+    res.json({
+      success: true,
+      message: `账号【${target.displayName}】密码已成功修改！`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 10.4 Delete account
+app.delete('/api/accounts/:username', (req, res) => {
+  try {
+    const auth = verifySuperAdminPermission(req);
+    if (!auth.allowed) {
+      return res.status(403).json({ error: auth.message || '仅总管理员有权限删除账号' });
+    }
+
+    const username = String(req.params.username).trim().toLowerCase();
+    if (username === 'admin') {
+      return res.status(400).json({ error: '禁止删除系统根总管理员账号（admin）' });
+    }
+
+    const index = adminAccounts.findIndex(a => a.username.toLowerCase() === username);
+    if (index === -1) {
+      return res.status(404).json({ error: `未找到账号【${username}】` });
+    }
+
+    const deleted = adminAccounts.splice(index, 1)[0];
+    res.json({
+      success: true,
+      message: `账号【${deleted.displayName} (${deleted.username})】已成功删除！`
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -6,14 +6,14 @@ import {
   Loader2, 
   Sparkles
 } from 'lucide-react';
-import type { SystemConfig, ClassGroup, Student, AttendanceRecord, AdminUser } from './types';
+import type { SystemConfig, ClassGroup, Student, AttendanceRecord, AdminUser, AdminAccount } from './types';
 import { Header } from './components/Header';
 import { TodayDashboard } from './components/TodayDashboard';
 import { MonthlyReportView } from './components/MonthlyReportView';
 import { AnnualReportView } from './components/AnnualReportView';
 import { SettingsModal } from './components/SettingsModal';
 import { LoginModal } from './components/LoginModal';
-import { getLocalData, saveLocalData, resetLocalData } from './utils/localStore';
+import { getLocalData, saveLocalData, resetLocalData, getLocalAccounts, saveLocalAccount, deleteLocalAccount, updateLocalAccountPassword } from './utils/localStore';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'today' | 'monthly' | 'annual' | 'settings'>('today');
@@ -64,6 +64,7 @@ export default function App() {
   const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [accounts, setAccounts] = useState<AdminAccount[]>(() => getLocalAccounts());
   const [activeSunday, setActiveSunday] = useState<string>('2026-09-13');
 
   const previousRecordsCountRef = useRef<number>(0);
@@ -77,6 +78,9 @@ export default function App() {
         setConfig(data.config);
         setClasses(data.classes);
         setStudents(data.students);
+        if (data.accounts) {
+          setAccounts(data.accounts);
+        }
         setActiveSunday(data.activeSunday);
 
         // Keep local cache synced as fallback
@@ -490,6 +494,89 @@ export default function App() {
     setTimeout(() => setNewCheckinAlert(null), 3000);
   };
 
+  // Handle save/create admin account (superadmin only)
+  const handleSaveAccount = async (accountData: Partial<AdminAccount> & { username: string }) => {
+    if (currentUser?.role !== 'superadmin') {
+      throw new Error('权限不足：仅总管理员可新建或修改管理账号！');
+    }
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(accountData),
+      });
+      if (res.ok) {
+        await loadState(false);
+        return;
+      } else {
+        const err = await res.json();
+        throw new Error(err.error || '保存账号失败');
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('fetch')) {
+        throw e;
+      }
+      // Offline fallback
+      const updated = saveLocalAccount(accountData);
+      setAccounts(updated);
+    }
+  };
+
+  // Handle delete admin account (superadmin only)
+  const handleDeleteAccount = async (username: string) => {
+    if (currentUser?.role !== 'superadmin') {
+      throw new Error('权限不足：仅总管理员可删除管理账号！');
+    }
+    try {
+      const res = await fetch(`/api/accounts/${encodeURIComponent(username)}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        await loadState(false);
+        return;
+      } else {
+        const err = await res.json();
+        throw new Error(err.error || '删除账号失败');
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('fetch')) {
+        throw e;
+      }
+      // Offline fallback
+      const updated = deleteLocalAccount(username);
+      setAccounts(updated);
+    }
+  };
+
+  // Handle modify admin account password (superadmin only)
+  const handleChangeAccountPassword = async (username: string, newPassword: string) => {
+    if (currentUser?.role !== 'superadmin') {
+      throw new Error('权限不足：仅总管理员可修改管理账号密码！');
+    }
+    try {
+      const res = await fetch('/api/accounts/password', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ username, newPassword }),
+      });
+      if (res.ok) {
+        await loadState(false);
+        return;
+      } else {
+        const err = await res.json();
+        throw new Error(err.error || '修改密码失败');
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('fetch')) {
+        throw e;
+      }
+      // Offline fallback
+      const updated = updateLocalAccountPassword(username, newPassword);
+      setAccounts(updated);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-amber-50/40 flex flex-col items-center justify-center p-4">
@@ -568,6 +655,7 @@ export default function App() {
             config={config}
             classes={classes}
             students={students}
+            accounts={accounts}
             currentUser={currentUser}
             onSaveConfig={handleSaveConfig}
             onSaveClass={handleSaveClass}
@@ -577,6 +665,9 @@ export default function App() {
             onDeleteStudent={handleDeleteStudent}
             onResetData={handleResetData}
             onOpenLogin={() => setIsLoginModalOpen(true)}
+            onSaveAccount={handleSaveAccount}
+            onDeleteAccount={handleDeleteAccount}
+            onChangeAccountPassword={handleChangeAccountPassword}
           />
         )}
       </main>

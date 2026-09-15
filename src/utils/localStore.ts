@@ -1,5 +1,5 @@
 import { initialClasses, initialStudents, initialSystemConfig, generateInitialRecords } from '../mockData';
-import type { ClassGroup, Student, SystemConfig, AttendanceRecord, AdminUser } from '../types';
+import type { ClassGroup, Student, SystemConfig, AttendanceRecord, AdminUser, AdminAccount } from '../types';
 
 const STORAGE_KEYS = {
   CLASSES: 'bethel_classes',
@@ -7,8 +7,113 @@ const STORAGE_KEYS = {
   CONFIG: 'bethel_config',
   RECORDS: 'bethel_records',
   ACTIVE_SUNDAY: 'bethel_active_sunday',
-  INITIALIZED: 'bethel_data_initialized'
+  INITIALIZED: 'bethel_data_initialized',
+  ACCOUNTS: 'bethel_admin_accounts'
 };
+
+export const DEFAULT_ACCOUNTS: AdminAccount[] = [
+  {
+    id: 'acc-admin',
+    username: 'admin',
+    displayName: '伯特利教会 • 总管理员',
+    role: 'superadmin',
+    password: 'bethel2026',
+    createdAt: '2026-01-01'
+  },
+  {
+    id: 'acc-teacher',
+    username: 'teacher',
+    displayName: '主日学主班教务老师',
+    role: 'teacher',
+    password: 'bethel123',
+    createdAt: '2026-01-01'
+  },
+  {
+    id: 'acc-fellowship',
+    username: 'fellowship',
+    displayName: '团契带领同工',
+    role: 'fellowship_leader',
+    password: 'fellowship123',
+    createdAt: '2026-01-01'
+  }
+];
+
+export function getLocalAccounts(): AdminAccount[] {
+  if (typeof window === 'undefined') return DEFAULT_ACCOUNTS;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(DEFAULT_ACCOUNTS));
+      return DEFAULT_ACCOUNTS;
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_ACCOUNTS;
+  } catch {
+    return DEFAULT_ACCOUNTS;
+  }
+}
+
+export function saveLocalAccounts(accounts: AdminAccount[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(accounts));
+  } catch (e) {
+    console.warn('Failed to save accounts to localStorage', e);
+  }
+}
+
+export function saveLocalAccount(accountData: Partial<AdminAccount> & { username: string }): AdminAccount[] {
+  const accounts = getLocalAccounts();
+  const cleanUsername = accountData.username.trim().toLowerCase();
+  const index = accounts.findIndex(a => a.username.toLowerCase() === cleanUsername);
+
+  if (index >= 0) {
+    // Update existing account
+    accounts[index] = {
+      ...accounts[index],
+      displayName: accountData.displayName || accounts[index].displayName,
+      role: (cleanUsername === 'admin' ? 'superadmin' : (accountData.role || accounts[index].role)),
+      password: accountData.password || accounts[index].password
+    };
+  } else {
+    // Create new account
+    const newAcc: AdminAccount = {
+      id: `acc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      username: cleanUsername,
+      displayName: accountData.displayName || cleanUsername,
+      role: accountData.role || 'teacher',
+      password: accountData.password || '123456',
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    accounts.push(newAcc);
+  }
+
+  saveLocalAccounts(accounts);
+  return accounts;
+}
+
+export function deleteLocalAccount(username: string): AdminAccount[] {
+  const accounts = getLocalAccounts();
+  const cleanUsername = username.trim().toLowerCase();
+  if (cleanUsername === 'admin') {
+    throw new Error('不能删除系统根总管理员账号（admin）');
+  }
+  const filtered = accounts.filter(a => a.username.toLowerCase() !== cleanUsername);
+  saveLocalAccounts(filtered);
+  return filtered;
+}
+
+export function updateLocalAccountPassword(username: string, newPassword: string): AdminAccount[] {
+  const accounts = getLocalAccounts();
+  const cleanUsername = username.trim().toLowerCase();
+  const target = accounts.find(a => a.username.toLowerCase() === cleanUsername);
+  if (!target) {
+    throw new Error(`未找到账号 ${username}`);
+  }
+  target.password = newPassword.trim();
+  saveLocalAccounts(accounts);
+  return accounts;
+}
 
 export function getLocalData() {
   if (typeof window === 'undefined') {
@@ -143,37 +248,34 @@ export function localLogin(username: string, password: string): AdminUser | null
   const cleanU = username.trim().toLowerCase();
   const cleanP = password.trim();
 
-  // Superadmin
-  if (cleanU === 'admin') {
+  // 1. Check in stored accounts
+  const accounts = getLocalAccounts();
+  const matched = accounts.find(a => a.username.toLowerCase() === cleanU);
+  if (matched) {
+    // For admin account, also allow systemConfig.adminPassword
     const local = getLocalData();
-    const adminPass = local.config.adminPassword || 'bethel2026';
-    if (cleanP === adminPass || cleanP === 'bethel2026') {
+    const isPassMatched = matched.password === cleanP || 
+      (cleanU === 'admin' && (cleanP === (local.config.adminPassword || 'bethel2026') || cleanP === 'bethel2026'));
+    
+    if (isPassMatched) {
       return {
-        username: 'admin',
-        displayName: '伯特利教会 • 总管理员',
-        role: 'superadmin',
-        token: 'local-admin-token'
+        username: matched.username,
+        displayName: matched.displayName,
+        role: matched.role,
+        token: `local-${matched.username}-token-${Date.now()}`
       };
     }
   }
 
-  // Teacher
-  if (cleanU === 'teacher' && (cleanP === 'teacher2026' || cleanP === '123456')) {
+  // 2. Superadmin fallback using adminPassword
+  const local = getLocalData();
+  const adminPass = local.config.adminPassword || 'bethel2026';
+  if (cleanU === 'admin' && (cleanP === adminPass || cleanP === 'bethel2026')) {
     return {
-      username: 'teacher',
-      displayName: '主日学主班教务老师',
-      role: 'teacher',
-      token: 'local-teacher-token'
-    };
-  }
-
-  // Fellowship Leader
-  if (cleanU === 'fellowship' && (cleanP === 'fellowship2026' || cleanP === '123456')) {
-    return {
-      username: 'fellowship',
-      displayName: '团契带领同工',
-      role: 'fellowship_leader',
-      token: 'local-fellowship-token'
+      username: 'admin',
+      displayName: '伯特利教会 • 总管理员',
+      role: 'superadmin',
+      token: 'local-admin-token'
     };
   }
 

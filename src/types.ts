@@ -82,6 +82,15 @@ export interface AdminUser {
   token?: string;
 }
 
+export interface AdminAccount {
+  id?: string;
+  username: string;
+  displayName: string;
+  role: 'superadmin' | 'teacher' | 'fellowship_leader';
+  password?: string;
+  createdAt?: string;
+}
+
 export interface AttendanceStats {
   totalStudents: number;
   presentCount: number;
