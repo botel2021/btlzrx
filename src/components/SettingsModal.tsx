@@ -99,6 +99,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [singlePhone, setSinglePhone] = useState('');
   const [isAddingSingle, setIsAddingSingle] = useState(false);
 
+  // Student Editing Modal / State
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [editStudentName, setEditStudentName] = useState('');
+  const [editStudentGender, setEditStudentGender] = useState<'boy' | 'girl'>('boy');
+  const [editStudentBirthDate, setEditStudentBirthDate] = useState('2020-01-01');
+  const [editStudentClassId, setEditStudentClassId] = useState('');
+  const [editStudentMemberCode, setEditStudentMemberCode] = useState('');
+  const [editStudentParentName, setEditStudentParentName] = useState('');
+  const [editStudentParentPhone, setEditStudentParentPhone] = useState('');
+  const [isSavingStudent, setIsSavingStudent] = useState(false);
+
   // Default Options State (Syncs with config)
   const [optionsState, setOptionsState] = useState({
     enableMemoryVerseOption: config.enableMemoryVerseOption ?? true,
@@ -221,6 +233,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       showNotice('error', err.message || '删除失败，请重试');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Open edit modal for Student
+  const handleOpenEditStudent = (stu: Student) => {
+    if (!isSuperAdmin) {
+      showNotice('error', '权限受限：除了总管理员之外，其他账号只有管理签到权限，没有编辑学员资料的权限！');
+      return;
+    }
+    setEditingStudent(stu);
+    setEditStudentName(stu.name);
+    setEditStudentGender(stu.gender);
+    setEditStudentBirthDate(stu.birthDate || '2020-01-01');
+    setEditStudentClassId(stu.classId);
+    setEditStudentMemberCode(stu.memberCode || '');
+    setEditStudentParentName(stu.parentName || '');
+    setEditStudentParentPhone(stu.parentPhone || '');
+    setIsStudentModalOpen(true);
+  };
+
+  // Submit edited student
+  const handleSaveStudentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    if (!isSuperAdmin) {
+      showNotice('error', '权限受限：除了总管理员之外，其他账号没有编辑学员资料的权限！');
+      return;
+    }
+    if (!editStudentName.trim()) {
+      showNotice('error', '请输入学员姓名');
+      return;
+    }
+    if (!editStudentClassId) {
+      showNotice('error', '请选择学员所属班级/团契');
+      return;
+    }
+    setIsSavingStudent(true);
+    try {
+      const updatedData: Student = {
+        ...editingStudent,
+        name: editStudentName.trim(),
+        gender: editStudentGender,
+        birthDate: editStudentBirthDate,
+        age: calculateAge(editStudentBirthDate),
+        classId: editStudentClassId,
+        memberCode: editStudentMemberCode.trim(),
+        parentName: editStudentParentName.trim(),
+        parentPhone: editStudentParentPhone.trim(),
+      };
+      await onAddStudent(updatedData);
+      showNotice('success', `学员「${updatedData.name}」资料已成功更新！`);
+      setIsStudentModalOpen(false);
+      setEditingStudent(null);
+    } catch (err: any) {
+      showNotice('error', err.message || '更新学员资料失败');
+    } finally {
+      setIsSavingStudent(false);
     }
   };
 
@@ -711,15 +780,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </td>
                             <td className="px-3.5 py-2.5 text-right">
                               {isSuperAdmin ? (
-                                <button
-                                  onClick={() => handleRequestDeleteStudent(stu)}
-                                  className="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
-                                  title="移出名册"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => handleOpenEditStudent(stu)}
+                                    className="px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer border border-amber-200/80 shadow-2xs"
+                                    title="编辑学员档案资料"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                    <span>编辑</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleRequestDeleteStudent(stu)}
+                                    className="text-slate-400 hover:text-red-600 p-1.5 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
+                                    title="移出名册"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               ) : (
-                                <span className="text-[11px] text-slate-400 flex items-center justify-end gap-1 px-1 py-0.5" title="无删除权限（仅总管理员可操作）">
+                                <span className="text-[11px] text-slate-400 flex items-center justify-end gap-1 px-1 py-0.5" title="无修改权限（仅总管理员可操作）">
                                   <Lock className="w-3 h-3 text-slate-300" />
                                   <span>只读</span>
                                 </span>
@@ -1421,6 +1500,184 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               </div>
 
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* EDIT STUDENT MODAL (编辑学员档案与资料) */}
+      {/* ========================================================================= */}
+      {isStudentModalOpen && editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl border border-amber-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            
+            <div className="bg-linear-to-r from-amber-700 to-amber-800 text-white p-5 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base font-serif flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-amber-200" />
+                  <span>编辑学员档案资料</span>
+                </h3>
+                <p className="text-xs text-amber-200 mt-0.5">
+                  修改学员【{editingStudent.name}】的姓名、生日年龄、班级归属及家长联络信息
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStudentModalOpen(false);
+                  setEditingStudent(null);
+                }}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveStudentSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    学员姓名 *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editStudentName}
+                    onChange={e => setEditStudentName(e.target.value)}
+                    placeholder="例如: 张以诺 (Samuel)"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    性别 *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditStudentGender('boy')}
+                      className={`py-2 rounded-xl text-xs font-medium border transition-colors cursor-pointer text-center ${
+                        editStudentGender === 'boy'
+                          ? 'bg-blue-50 border-blue-400 text-blue-800 font-bold'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      男 (弟兄)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditStudentGender('girl')}
+                      className={`py-2 rounded-xl text-xs font-medium border transition-colors cursor-pointer text-center ${
+                        editStudentGender === 'girl'
+                          ? 'bg-rose-50 border-rose-400 text-rose-800 font-bold'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      女 (姊妹)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    出生年月日 *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editStudentBirthDate}
+                    onChange={e => setEditStudentBirthDate(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
+                  />
+                  <span className="text-[10px] text-amber-800 font-medium mt-1 block">
+                    系统自动换算：{calculateAge(editStudentBirthDate)} 周岁
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    所属班级 / 团契 *
+                  </label>
+                  <select
+                    value={editStudentClassId}
+                    onChange={e => setEditStudentClassId(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
+                  >
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.ageRange})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    学号 / 会友编号
+                  </label>
+                  <input
+                    type="text"
+                    value={editStudentMemberCode}
+                    onChange={e => setEditStudentMemberCode(e.target.value)}
+                    placeholder="例如: BTL-08"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    家长 / 监护人姓名
+                  </label>
+                  <input
+                    type="text"
+                    value={editStudentParentName}
+                    onChange={e => setEditStudentParentName(e.target.value)}
+                    placeholder="例如: 张建军 / 本人"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  家长紧急联络电话
+                </label>
+                <input
+                  type="text"
+                  value={editStudentParentPhone}
+                  onChange={e => setEditStudentParentPhone(e.target.value)}
+                  placeholder="例如: 13800559922"
+                  className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-mono"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsStudentModalOpen(false);
+                    setEditingStudent(null);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingStudent}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white cursor-pointer shadow-2xs flex items-center gap-1.5"
+                >
+                  {isSavingStudent ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>{isSavingStudent ? '正在保存...' : '保存学员资料'}</span>
+                </button>
+              </div>
             </form>
 
           </div>

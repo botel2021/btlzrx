@@ -150,7 +150,7 @@ export const TodayDashboard: React.FC<TodayDashboardProps> = ({
               className="self-start sm:self-center px-5 py-2.5 rounded-xl bg-white text-slate-900 hover:bg-amber-50 font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 shrink-0 cursor-pointer"
             >
               <LogIn className="w-4 h-4 text-amber-700" />
-              <span>教师 / 同工登录签到</span>
+              <span>教师登录签到</span>
             </button>
           </div>
         </div>

@@ -42,10 +42,21 @@ export function getLocalData() {
     }
 
     const rawClasses = localStorage.getItem(STORAGE_KEYS.CLASSES);
-    const classes: ClassGroup[] = rawClasses ? JSON.parse(rawClasses) : initialClasses;
+    let classes: ClassGroup[] = rawClasses ? JSON.parse(rawClasses) : initialClasses;
 
     const rawStudents = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-    const students: Student[] = rawStudents ? JSON.parse(rawStudents) : initialStudents;
+    let students: Student[] = rawStudents ? JSON.parse(rawStudents) : initialStudents;
+
+    // Check if migration is needed to the new 8 classes
+    const needsClassMigration = !classes || classes.length < 8 || classes.some(c => c.name.includes('喜乐') || c.name.includes('约书亚'));
+    if (needsClassMigration) {
+      classes = initialClasses;
+      students = initialStudents;
+      const refreshedRecords = generateInitialRecords(students);
+      localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
+      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
+      localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(refreshedRecords));
+    }
 
     const rawConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
     const config: SystemConfig = rawConfig ? { ...initialSystemConfig, ...JSON.parse(rawConfig) } : initialSystemConfig;
@@ -122,7 +133,7 @@ export function localLogin(username: string, password: string): AdminUser | null
     if (cleanP === adminPass || cleanP === 'bethel2026') {
       return {
         username: 'admin',
-        displayName: '伯特利教会 • 主任牧师/管理员',
+        displayName: '伯特利教会 • 总管理员',
         role: 'superadmin',
         token: 'local-admin-token'
       };

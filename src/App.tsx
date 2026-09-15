@@ -349,10 +349,10 @@ export default function App() {
     });
   };
 
-  // Handle add student
+  // Handle add or update student
   const handleAddStudent = async (studentData: any) => {
     if (currentUser?.role !== 'superadmin') {
-      throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加学员的权限！');
+      throw new Error('权限不足：除了总管理员之外，其他账号只有管理签到权限，没有添加或编辑学员的权限！');
     }
     try {
       const res = await fetch('/api/students', {
@@ -368,14 +368,32 @@ export default function App() {
       // Offline / Static
     }
     setStudents(prev => {
-      const newStudent: Student = {
-        ...studentData,
-        id: `s-${Date.now()}`
-      };
-      const updated = [...prev, newStudent];
+      let updated: Student[];
+      if (studentData.id) {
+        updated = prev.map(s => s.id === studentData.id ? { ...s, ...studentData } : s);
+      } else {
+        const newStudent: Student = {
+          ...studentData,
+          id: `s-${Date.now()}`
+        };
+        updated = [...prev, newStudent];
+      }
       saveLocalData({ students: updated });
       return updated;
     });
+
+    // If updating student, also sync attendance record names
+    if (studentData.id && studentData.name) {
+      setRecords(prev => {
+        const updated = prev.map(r => r.studentId === studentData.id ? { 
+          ...r, 
+          studentName: studentData.name, 
+          classId: studentData.classId || r.classId 
+        } : r);
+        saveLocalData({ records: updated });
+        return updated;
+      });
+    }
   };
 
   // Handle batch add students
